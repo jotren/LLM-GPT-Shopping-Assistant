@@ -1,0 +1,23 @@
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+/workbooks/.virtual_documents/
+
+# Python bytecode files
+__pycache__/
+
+# Specific directories
+/data/
+/presentation/
+/workbooks/mlruns/
+/workbooks/ipynb_checkpoints/
+/.virtual_documents/
+/src/models/.ipynb_checkpoints/
+*.csv
+*.joblib
+/models/trained-models/
+*.txt
+*.db
+*.jpg
+*.npy
+/models/model_weights.pth
+*.env
