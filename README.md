@@ -1,17 +1,17 @@
 # Fashion AI Chat Bot
 
-Aim of this project is to make a bot that can reccomend fashion items based on a request. To achieve this I will be using: 
+The aim of this project is to develop a bot that recommends fashion items based on user requests. To achieve this, we will use the following technologies:
 
-- SQL Queries: To categorise items
-- PIL OpenAI: For the conversion of images into vector embeddings
-- HNSWlib : Hierarchical Navigable Small World library for vector querying of images
-- Chat GPT API tools: Allow the user to interact with an AI bot, this way the user is able to ask questions and get suggestions.
+- **SQL Queries**: To categorize items
+- **PIL (Python Imaging Library)**: For converting images into vector embeddings
+- **HNSWlib**: Hierarchical Navigable Small World library for vector querying of images
+- **Chat GPT API tools**: Allowing users to interact with an AI bot for questions and suggestions
 
-This combined approach of Low-fi and High-fi I think will provide a robust query system for the user.
+This combined approach of low-fidelity (Low-fi) and high-fidelity (High-fi) methods will provide a robust query system for users.
 
 ### Data
 
-Have downloaded a file with training data from [here](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small?select=images). This dataset has a number of images, with some additional tags for each image id in a csv. Here is how the csv dataset is structured:
+We have downloaded a training dataset from [Kaggle](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small?select=images). This dataset includes numerous images, each tagged with additional information in a CSV file. The CSV dataset is structured as follows:
 
 - id
 - gender
@@ -22,15 +22,15 @@ Have downloaded a file with training data from [here](https://www.kaggle.com/dat
 - season
 - usage
 
-Each image will be processed for embeddings so that the images can be queried with words.
+Each image will be processed into embeddings so that they can be queried using descriptive words.
 
 ### Vectorisation Approach
 
-The data was first parsed and then saved into a SQL database using SQLalchemy. Following this we created the embeddings for the images using PIl. This is a 512 dimensional vector that can accurately summarise the image.
+The data is first parsed and then saved into a SQL database using SQLAlchemy. Following this, we create embeddings for the images using PIL. Each embedding is a 512-dimensional vector that accurately summarizes the image.
 
-This works by having a number of layers, the top layer is a representation of the vectors, but only has a limited number of entry points. HNSW (Hierarchical Navigable Small World) is an algorithm designed for efficient approximate nearest neighbor search. It organizes data into a multi-layer graph to enable fast and accurate search operations.
+This process involves multiple layers, where the top layer represents the vectors but has a limited number of entry points. HNSW (Hierarchical Navigable Small World) is an algorithm designed for efficient approximate nearest neighbor search, organizing data into a multi-layer graph for fast and accurate search operations.
 
-![HMSW](./images/HNSW.png)
+![HNSW](./images/HNSW.png)
 
 ### How It Works
 1. **Multi-Layer Graph**:
@@ -87,27 +87,6 @@ def generate_embedding(image_path):
     except Exception as e:
         print(f"Error generating embedding for {image_path}: {e}")
         return None
-
-# Collect Embeddings and Metadata
-embeddings = []
-image_ids = []
-faiss_index = 0
-
-# Wrap the loop with tqdm for progress tracking
-for idx, row in tqdm(metadata.iterrows(), total=metadata.shape[0], desc="Processing images"):
-    image_path = os.path.join(images_folder, str(row['id'])+".jpg")
-    image_path = os.path.normpath(image_path)  # Normalize the path to ensure consistency
-    if os.path.exists(image_path):
-        embedding = generate_embedding(image_path)
-        if embedding is not None:
-            embeddings.append(embedding)
-            image_ids.append(row['id'])
-
-# Convert Embeddings to Numpy Array and Save to Disk
-embeddings = np.vstack(embeddings).astype('float32')
-np.save(embeddings_file, embeddings)
-np.save(image_ids_file, image_ids)
-
 ```
 These embeddings are the saved on a local machine rather than in a database. 
 
@@ -127,39 +106,99 @@ def search_similar_images(index, query_embedding, image_ids, top_k=5):
     similar_image_ids = [image_ids[i] for i in labels[0]]
     return similar_image_ids
 
-def display_images(image_ids, image_folder_path, max_images=5):
-    for i, image_id in enumerate(image_ids):
-        if i >= max_images:
-            break
-        image_path = os.path.join(image_folder_path, f"{image_id}.jpg")
-        if os.path.exists(image_path):
-            img = Image.open(image_path)
-            display(img)
-        else:
-            print(f"Image {image_id} not found")
-
-# Function to query and display similar images
-def query_and_display_images(query_text, top_k=5, display=False):
-    query_embedding = generate_text_embedding(query_text, model, device)
-    query_embedding = query_embedding / np.linalg.norm(query_embedding)
-    similar_image_ids = search_similar_images(hnsw_index, query_embedding, image_ids, top_k)
-    if display:
-        display_images(similar_image_ids, image_folder_path)
-    return similar_image_ids
-
-# Example usage in Jupyter Notebook
-query_text = "yellow shoes"
-monitor_resources()  # Monitor resources before the query
-similar_image_ids = query_and_display_images(query_text, top_k=5, display=True)
-monitor_resources()  # Monitor resources after the query
-print(similar_image_ids)
-
 ```
 
-When we query the HNSWLib layer structure, the algorithmn will perform a rapid KNN to return the embeddings that most accurately describe our description. In the case of __yellow shoes__ this was the result: 
+When we query the HNSWLib layer structure, the algorithm performs a rapid KNN to return the embeddings that most accurately describe our description. For example, querying for __yellow shoes__ produces the following result:
 
 ![HMSW](./images/yellow_shoes_result.png)
 
 ### GPT Integration Approach
 
-Now that we have a system that can 
+Now that we have a system that can parse through a database and retrieve images, we need to integrate a GPT model to allow users to ask questions.
+
+For an in-depth solution to asking questions to a database, see this [repository](https://github.com/jotren/GPT-Database-Integration). Essentially, we need to use recursion, tool calls, and GPT-4o to achieve this. The core function is as follows:
+
+```python
+def run_conversation(user_query, introduction, top_k, max_depth, session_messages=None):
+    print(max_depth)
+    if session_messages is None:
+        session_messages = []
+
+    if not session_messages:
+        session_messages.append({"role": "system", "content": introduction})
+
+    tools = define_tools()
+
+    all_image_paths_dict = {}
+    all_responses = []
+
+    session_messages.append({"role": "user", "content": user_query})
+    depth = 0
+
+    while depth < max_depth:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=session_messages,
+            tools=tools,
+            tool_choice="auto"
+        )
+
+        response_content = response.choices[0].message.content
+
+        print(response)
+        
+        if response_content:
+            all_responses.append(response_content)
+            session_messages.append({"role": "assistant", "content": response_content})
+
+        finish_reason = response.choices[0].finish_reason
+        if finish_reason == "stop":
+            break
+        elif finish_reason == "tool_calls":
+            tool_calls = response.choices[0].message.tool_calls
+            for tool_call in tool_calls:
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
+                print('functions')
+                print(function_name)
+                print(function_args)
+                function_response = handle_function_call(function_name, function_args, top_k)
+                session_messages.append({"role": "system", "name": function_name, "content": json.dumps(function_response)})
+
+                if function_response:
+                    session_messages.append({"role": "system", "name": function_name, "content": json.dumps(function_response)})
+
+                    if function_name == "query_database":
+                        for item_name, paths in function_response.items():
+                            if item_name not in all_image_paths_dict:
+                                all_image_paths_dict[item_name] = []
+                            all_image_paths_dict[item_name].extend(paths)
+            
+                
+            depth += 1
+        else:
+            print(f'Unhandled finish reason: {finish_reason}')
+            break
+
+    return all_responses, session_messages, all_image_paths_dict
+
+```
+![HMSW](./images/example_GPT_output.png)
+
+### Furter Improvements
+
+I would like the system to be able to filter by
+
+- Brand
+- Season
+- Year
+
+This would allow the user to tailor requests better.
+
+### Key Learnings
+
+- __GPT-4o__: The normal GPT cannot return an array of functions with which to call. In our case, we need to parse the database for multiple items of clothing, which requires a number of calls to the database.
+- __HNSW__: Faster and more robust than FAISS or Scann. FAISS didn't support GPU acceleration on a Windows machine, and Scann was very hard to compile and deploy.
+- __Low-Resolution Images__: Can still provide meaningful output. If pushed to production, compression of images would be key. You would probably just save a URL to the image with embeddings, but during processing, low resolution might save you with respect to processing power.
+
+
