@@ -30,7 +30,7 @@ The data is first parsed and then saved into a SQL database using SQLAlchemy. Fo
 
 This process involves multiple layers, where the top layer represents the vectors but has a limited number of entry points. HNSW (Hierarchical Navigable Small World) is an algorithm designed for efficient approximate nearest neighbor search, organizing data into a multi-layer graph for fast and accurate search operations.
 
-![HNSW](./images/HNSW.png)
+![HSNW](./images/HSNW.png)
 
 ### How It Works
 1. **Multi-Layer Graph**:
